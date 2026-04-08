@@ -25,9 +25,6 @@ function handleVerification(req: VercelRequest, res: VercelResponse) {
 
 // Każde zdarzenie ze Stravy (create/update/delete aktywności)
 async function handleEvent(req: VercelRequest, res: VercelResponse) {
-  // Odpowiadamy natychmiast — Strava wymaga odpowiedzi w ciągu 2 sekund
-  res.status(200).end();
-
   const event = req.body as {
     object_type: string;
     aspect_type: string;
@@ -36,13 +33,15 @@ async function handleEvent(req: VercelRequest, res: VercelResponse) {
   };
 
   // Obsługujemy tylko nowe aktywności
-  if (event.object_type !== 'activity' || event.aspect_type !== 'create') return;
+  if (event.object_type !== 'activity' || event.aspect_type !== 'create') {
+    return res.status(200).end();
+  }
 
   try {
     const accessToken = await getValidAccessToken(event.owner_id);
     if (!accessToken) {
       console.warn(`No token for athlete ${event.owner_id}`);
-      return;
+      return res.status(200).end();
     }
 
     const activity = await fetchActivity(accessToken, event.object_id);
@@ -50,4 +49,6 @@ async function handleEvent(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     console.error('Webhook processing error:', err);
   }
+
+  res.status(200).end();
 }
