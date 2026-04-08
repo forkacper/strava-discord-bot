@@ -7,8 +7,8 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
-    "@vercel/kv": "^3.0.0",
-    "axios": "^1.7.9"
+    "axios": "^1.7.9",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "@vercel/node": "^5.1.7",

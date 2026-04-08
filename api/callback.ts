@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { kv } from '@vercel/kv';
+import { getRedis } from '../src/redis';
 import { exchangeCode } from '../src/strava';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -11,7 +11,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { athleteId, athleteName, tokens } = await exchangeCode(code);
-    await kv.set(`tokens:${athleteId}`, tokens);
+    const redis = await getRedis();
+    await redis.set(`tokens:${athleteId}`, JSON.stringify(tokens));
 
     res.status(200).send(`
       <html><body style="font-family:sans-serif;text-align:center;padding:60px">

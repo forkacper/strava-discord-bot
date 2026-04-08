@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { kv } from '@vercel/kv';
+import { getRedis } from './redis';
 
 const TOKEN_URL = 'https://www.strava.com/oauth/token';
 const API_URL = 'https://www.strava.com/api/v3';
@@ -27,19 +27,39 @@ export interface StravaActivity {
   athlete: { id: number; firstname: string; lastname: string };
 }
 
-export async function getValidAccessToken(athleteId: number): Promise<string | null> {
-  const raw = await kv.get<TokenData>(`tokens:${athleteId}`);
-  if (!raw) return null;
+function seedTokenFromEnv(): TokenData | null {
+  const { STRAVA_ATHLETE_ID, STRAVA_ACCESS_TOKEN, STRAVA_REFRESH_TOKEN } = process.env;
+  if (!STRAVA_ATHLETE_ID || !STRAVA_ACCESS_TOKEN || !STRAVA_REFRESH_TOKEN) return null;
+  return {
+    athlete_id: Number(STRAVA_ATHLETE_ID),
+    access_token: STRAVA_ACCESS_TOKEN,
+    refresh_token: STRAVA_REFRESH_TOKEN,
+    expires_at: 0, // wymuś odświeżenie przy pierwszym użyciu
+  };
+}
 
-  if (Date.now() / 1000 < raw.expires_at - 60) {
-    return raw.access_token;
+export async function getValidAccessToken(athleteId: number): Promise<string | null> {
+  const redis = await getRedis();
+  const raw = await redis.get(`tokens:${athleteId}`);
+
+  if (!raw) {
+    const seed = seedTokenFromEnv();
+    if (!seed || seed.athlete_id !== athleteId) return null;
+    await redis.set(`tokens:${athleteId}`, JSON.stringify(seed));
+    return getValidAccessToken(athleteId); // ponów z danymi w Redis
+  }
+
+  const tokenData: TokenData = JSON.parse(raw);
+
+  if (Date.now() / 1000 < tokenData.expires_at - 60) {
+    return tokenData.access_token;
   }
 
   const { data } = await axios.post(TOKEN_URL, {
     client_id: process.env.STRAVA_CLIENT_ID,
     client_secret: process.env.STRAVA_CLIENT_SECRET,
     grant_type: 'refresh_token',
-    refresh_token: raw.refresh_token,
+    refresh_token: tokenData.refresh_token,
   });
 
   const updated: TokenData = {
@@ -48,7 +68,7 @@ export async function getValidAccessToken(athleteId: number): Promise<string | n
     expires_at: data.expires_at,
     athlete_id: athleteId,
   };
-  await kv.set(`tokens:${athleteId}`, updated);
+  await redis.set(`tokens:${athleteId}`, JSON.stringify(updated));
 
   return updated.access_token;
 }
