@@ -55,10 +55,9 @@ function isRunLike(sportType: string): boolean {
   return ['Run', 'VirtualRun', 'Walk', 'Hike'].includes(sportType);
 }
 
-export async function sendActivityEmbed(activity: StravaActivity): Promise<void> {
+export async function sendActivityEmbed(activity: StravaActivity, athleteName: string): Promise<void> {
   const emoji = SPORT_EMOJI[activity.sport_type] ?? '🏅';
   const color = COLOR[activity.sport_type] ?? 0xfc4c02;
-  const athleteName = `${activity.athlete.firstname} ${activity.athlete.lastname}`;
   const activityUrl = `https://www.strava.com/activities/${activity.id}`;
 
   const speedField = isRunLike(activity.sport_type)

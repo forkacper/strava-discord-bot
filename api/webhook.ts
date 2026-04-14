@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getValidAccessToken, fetchActivity } from '../src/strava';
+import { getValidAccessToken, fetchActivity, getAthleteName } from '../src/strava';
 import { sendActivityEmbed } from '../src/discord';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -37,18 +37,22 @@ async function handleEvent(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
+  // Odpowiadamy natychmiast — Strava retry'uje jeśli nie dostanie 200 w ~2s
+  res.status(200).end();
+
   try {
     const accessToken = await getValidAccessToken(event.owner_id);
     if (!accessToken) {
       console.warn(`No token for athlete ${event.owner_id}`);
-      return res.status(200).end();
+      return;
     }
 
-    const activity = await fetchActivity(accessToken, event.object_id);
-    await sendActivityEmbed(activity);
+    const [activity, athleteName] = await Promise.all([
+      fetchActivity(accessToken, event.object_id),
+      getAthleteName(event.owner_id),
+    ]);
+    await sendActivityEmbed(activity, athleteName);
   } catch (err) {
     console.error('Webhook processing error:', err);
   }
-
-  res.status(200).end();
 }

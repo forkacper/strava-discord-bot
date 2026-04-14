@@ -9,6 +9,7 @@ export interface TokenData {
   refresh_token: string;
   expires_at: number;
   athlete_id: number;
+  athlete_name?: string;
 }
 
 export interface StravaActivity {
@@ -24,7 +25,7 @@ export interface StravaActivity {
   average_heartrate?: number;
   max_heartrate?: number;
   start_date: string;
-  athlete: { id: number; firstname: string; lastname: string };
+  athlete: { id: number };
 }
 
 function seedTokenFromEnv(): TokenData | null {
@@ -73,6 +74,14 @@ export async function getValidAccessToken(athleteId: number): Promise<string | n
   return updated.access_token;
 }
 
+export async function getAthleteName(athleteId: number): Promise<string> {
+  const redis = await getRedis();
+  const raw = await redis.get(`tokens:${athleteId}`);
+  if (!raw) return 'Nieznany atleta';
+  const tokenData: TokenData = JSON.parse(raw);
+  return tokenData.athlete_name ?? 'Nieznany atleta';
+}
+
 export async function fetchActivity(accessToken: string, activityId: number): Promise<StravaActivity> {
   const { data } = await axios.get(`${API_URL}/activities/${activityId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -97,6 +106,7 @@ export async function exchangeCode(code: string): Promise<{
     refresh_token: data.refresh_token,
     expires_at: data.expires_at,
     athlete_id: data.athlete.id,
+    athlete_name: `${data.athlete.firstname} ${data.athlete.lastname}`,
   };
 
   return {
