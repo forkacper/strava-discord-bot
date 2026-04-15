@@ -37,14 +37,11 @@ async function handleEvent(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  // Odpowiadamy natychmiast — Strava retry'uje jeśli nie dostanie 200 w ~2s
-  res.status(200).end();
-
   try {
     const accessToken = await getValidAccessToken(event.owner_id);
     if (!accessToken) {
       console.warn(`No token for athlete ${event.owner_id}`);
-      return;
+      return res.status(200).end();
     }
 
     const [activity, athleteName] = await Promise.all([
@@ -55,4 +52,6 @@ async function handleEvent(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     console.error('Webhook processing error:', err);
   }
+
+  res.status(200).end();
 }

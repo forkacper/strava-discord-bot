@@ -64,10 +64,10 @@ export async function getValidAccessToken(athleteId: number): Promise<string | n
   });
 
   const updated: TokenData = {
+    ...tokenData,
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: data.expires_at,
-    athlete_id: athleteId,
   };
   await redis.set(`tokens:${athleteId}`, JSON.stringify(updated));
 
