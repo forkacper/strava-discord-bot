@@ -1,0 +1,16 @@
+name: Poll Strava Club
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # pozwala uruchomić ręcznie z GitHub UI
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger poll
+        run: |
+          curl -sf -X GET \
+            "${{ secrets.APP_URL }}/api/poll" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { StravaActivity } from './strava';
+import { ClubActivity } from './strava';
 
 const SPORT_EMOJI: Record<string, string> = {
   Run: '🏃',
@@ -55,14 +55,15 @@ function isRunLike(sportType: string): boolean {
   return ['Run', 'VirtualRun', 'Walk', 'Hike'].includes(sportType);
 }
 
-export async function sendActivityEmbed(activity: StravaActivity, athleteName: string): Promise<void> {
+export async function sendActivityEmbed(activity: ClubActivity): Promise<void> {
   const emoji = SPORT_EMOJI[activity.sport_type] ?? '🏅';
   const color = COLOR[activity.sport_type] ?? 0xfc4c02;
-  const activityUrl = `https://www.strava.com/activities/${activity.id}`;
+  const athleteName = `${activity.athlete.firstname} ${activity.athlete.lastname}`;
+  const avgSpeed = activity.moving_time > 0 ? activity.distance / activity.moving_time : 0;
 
   const speedField = isRunLike(activity.sport_type)
-    ? { name: 'Tempo', value: formatPace(activity.average_speed), inline: true }
-    : { name: 'Prędkość', value: formatSpeed(activity.average_speed), inline: true };
+    ? { name: 'Tempo', value: formatPace(avgSpeed), inline: true }
+    : { name: 'Prędkość', value: formatSpeed(avgSpeed), inline: true };
 
   const fields = [
     { name: 'Dystans', value: formatDistance(activity.distance), inline: true },
@@ -71,31 +72,23 @@ export async function sendActivityEmbed(activity: StravaActivity, athleteName: s
     { name: 'Przewyższenie', value: `${Math.round(activity.total_elevation_gain)} m`, inline: true },
   ];
 
-  if (activity.average_heartrate) {
-    fields.push({
-      name: 'Tętno śr./max',
-      value: `${Math.round(activity.average_heartrate)} / ${Math.round(activity.max_heartrate ?? 0)} bpm`,
-      inline: true,
-    });
-  }
-
-  const embed = {
-    title: `${emoji} ${activity.name}`,
-    url: activityUrl,
-    color,
-    author: {
-      name: athleteName,
-      url: `https://www.strava.com/athletes/${activity.athlete.id}`,
-    },
-    fields,
-    footer: {
-      text: `${activity.sport_type} • ${new Date(activity.start_date).toLocaleDateString('pl-PL', {
+  const footerText = activity.start_date_local
+    ? `${activity.sport_type} • ${new Date(activity.start_date_local).toLocaleDateString('pl-PL', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-      })}`,
+      })}`
+    : activity.sport_type;
+
+  const embed = {
+    title: `${emoji} ${activity.name}`,
+    color,
+    author: { name: athleteName },
+    fields,
+    footer: {
+      text: footerText,
       icon_url: 'https://www.strava.com/favicon.ico',
     },
   };

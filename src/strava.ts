@@ -9,23 +9,20 @@ export interface TokenData {
   refresh_token: string;
   expires_at: number;
   athlete_id: number;
-  athlete_name?: string;
 }
 
-export interface StravaActivity {
-  id: number;
+export interface ClubActivity {
+  athlete: {
+    firstname: string;
+    lastname: string;
+  };
   name: string;
   sport_type: string;
-  distance: number;           // metry
-  moving_time: number;        // sekundy
-  elapsed_time: number;       // sekundy
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
   total_elevation_gain: number;
-  average_speed: number;      // m/s
-  max_speed: number;          // m/s
-  average_heartrate?: number;
-  max_heartrate?: number;
-  start_date: string;
-  athlete: { id: number };
+  start_date_local?: string;
 }
 
 function seedTokenFromEnv(): TokenData | null {
@@ -35,7 +32,7 @@ function seedTokenFromEnv(): TokenData | null {
     athlete_id: Number(STRAVA_ATHLETE_ID),
     access_token: STRAVA_ACCESS_TOKEN,
     refresh_token: STRAVA_REFRESH_TOKEN,
-    expires_at: 0, // wymuś odświeżenie przy pierwszym użyciu
+    expires_at: 0,
   };
 }
 
@@ -47,7 +44,7 @@ export async function getValidAccessToken(athleteId: number): Promise<string | n
     const seed = seedTokenFromEnv();
     if (!seed || seed.athlete_id !== athleteId) return null;
     await redis.set(`tokens:${athleteId}`, JSON.stringify(seed));
-    return getValidAccessToken(athleteId); // ponów z danymi w Redis
+    return getValidAccessToken(athleteId);
   }
 
   const tokenData: TokenData = JSON.parse(raw);
@@ -74,44 +71,10 @@ export async function getValidAccessToken(athleteId: number): Promise<string | n
   return updated.access_token;
 }
 
-export async function getAthleteName(athleteId: number): Promise<string> {
-  const redis = await getRedis();
-  const raw = await redis.get(`tokens:${athleteId}`);
-  if (!raw) return 'Nieznany atleta';
-  const tokenData: TokenData = JSON.parse(raw);
-  return tokenData.athlete_name ?? 'Nieznany atleta';
-}
-
-export async function fetchActivity(accessToken: string, activityId: number): Promise<StravaActivity> {
-  const { data } = await axios.get(`${API_URL}/activities/${activityId}`, {
+export async function fetchClubActivities(accessToken: string, clubId: number): Promise<ClubActivity[]> {
+  const { data } = await axios.get<ClubActivity[]>(`${API_URL}/clubs/${clubId}/activities`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    params: { per_page: 30 },
   });
   return data;
-}
-
-export async function exchangeCode(code: string): Promise<{
-  athleteId: number;
-  athleteName: string;
-  tokens: TokenData;
-}> {
-  const { data } = await axios.post(TOKEN_URL, {
-    client_id: process.env.STRAVA_CLIENT_ID,
-    client_secret: process.env.STRAVA_CLIENT_SECRET,
-    code,
-    grant_type: 'authorization_code',
-  });
-
-  const tokens: TokenData = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: data.expires_at,
-    athlete_id: data.athlete.id,
-    athlete_name: `${data.athlete.firstname} ${data.athlete.lastname}`,
-  };
-
-  return {
-    athleteId: data.athlete.id,
-    athleteName: `${data.athlete.firstname} ${data.athlete.lastname}`,
-    tokens,
-  };
 }
